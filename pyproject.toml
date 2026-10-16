@@ -1,0 +1,29 @@
+[project]
+name = "datathon2026"
+version = "0.1.0"
+description = "Retail Intelligence Dashboard - Anomaly Detection & Cost of Inaction Engine"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fastapi[standard]>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "sqlalchemy>=2.0.0",
+    "pandas>=2.2.0",
+    "numpy>=2.0.0",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27.0",
+    "pydantic>=2.7.0",
+]
+
+[project.scripts]
+generate-data = "scripts.generate_data:main"
+ingest = "scripts.ingest:main"
+run-ml = "scripts.run_ml:main"
+serve = "main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "rich>=13.0.0",
+]
