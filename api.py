@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -63,11 +63,118 @@ class RunPipelineResponse(BaseModel):
     timestamp: str
 
 
+class DatasetResponse(BaseModel):
+    message: str
+    files: dict[str, int]
+    anomalies_detected: int
+    timestamp: str
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
     return {"status": "ok", "db_ready": db_exists(), "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.get("/api/dataset")
+def dataset_status():
+    """Return row counts for the currently loaded dataset."""
+    if not db_exists():
+        return {"ready": False, "files": {}}
+    tables = ["products", "customers", "campaigns", "inventory", "transactions"]
+    with get_db() as conn:
+        counts = {
+            table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            for table in tables
+        }
+    return {"ready": any(counts.values()), "files": counts}
+
+
+@app.post("/api/dataset/upload", response_model=DatasetResponse)
+async def upload_dataset(files: list[UploadFile] = File(...)):
+    """Replace the active dataset with uploaded CSV files and run the ML scan."""
+    import shutil
+    import subprocess
+    import sys
+    from scripts.ingest import DATA_DIR
+
+    allowed = {"products.csv", "customers.csv", "campaigns.csv", "inventory.csv", "transactions.csv"}
+    uploads = {}
+    for upload in files:
+        filename = os.path.basename(upload.filename or "").lower()
+        if filename not in allowed:
+            raise HTTPException(
+                400,
+                f"Unsupported file '{upload.filename}'. Upload only: {', '.join(sorted(allowed))}.",
+            )
+        if filename in uploads:
+            raise HTTPException(400, f"Duplicate upload: {filename}")
+        uploads[filename] = upload
+
+    if not uploads:
+        raise HTTPException(400, "Upload at least one CSV file.")
+    required = {"transactions.csv", "products.csv", "customers.csv"}
+    missing = sorted(required - uploads.keys())
+    if missing:
+        raise HTTPException(
+            400,
+            f"Upload the core files too: {', '.join(missing)}. "
+            "campaigns.csv and inventory.csv are optional.",
+        )
+
+    os.makedirs(DATA_DIR, exist_ok=True)
+    for filename in allowed:
+        path = os.path.join(DATA_DIR, filename)
+        if filename in uploads:
+            try:
+                contents = await uploads[filename].read()
+                if not contents.strip():
+                    raise ValueError("file is empty")
+                with open(path, "wb") as destination:
+                    destination.write(contents)
+            except Exception as exc:
+                raise HTTPException(400, f"Could not save {filename}: {exc}") from exc
+        elif os.path.exists(path):
+            os.remove(path)
+
+    ingest_script = os.path.join(BASE_DIR, "scripts", "ingest.py")
+    ml_script = os.path.join(BASE_DIR, "scripts", "run_ml.py")
+    try:
+        ingest_result = subprocess.run(
+            [sys.executable, ingest_script],
+            capture_output=True, text=True, timeout=120,
+            encoding="utf-8", errors="replace",
+            env={**os.environ, "PYTHONUTF8": "1"},
+        )
+        if ingest_result.returncode != 0:
+            raise HTTPException(400, f"Dataset validation failed: {ingest_result.stderr[-2000:]}")
+        ml_result = subprocess.run(
+            [sys.executable, ml_script],
+            capture_output=True, text=True, timeout=120,
+            encoding="utf-8", errors="replace",
+            env={**os.environ, "PYTHONUTF8": "1"},
+        )
+        if ml_result.returncode != 0:
+            raise HTTPException(500, f"ML pipeline failed: {ml_result.stderr[-2000:]}")
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(504, "Dataset processing timed out.") from exc
+
+    with get_db() as conn:
+        counts = {
+            name[:-4]: conn.execute(f"SELECT COUNT(*) FROM {name[:-4]}").fetchone()[0]
+            for name in allowed
+        }
+        anomaly_count = conn.execute(
+            "SELECT COUNT(*) FROM anomalies WHERE status='open'"
+        ).fetchone()[0]
+
+    return DatasetResponse(
+        message="Dataset uploaded and model trained successfully",
+        files=counts,
+        anomalies_detected=anomaly_count,
+        timestamp=datetime.utcnow().isoformat(),
+    )
 
 
 # ── Dashboard Stats ───────────────────────────────────────────────────────────
@@ -312,7 +419,12 @@ def run_pipeline():
     try:
         result = subprocess.run(
             [sys.executable, script],
-            capture_output=True, text=True, timeout=120
+            capture_output=True,
+            text=True,
+            timeout=120,
+            encoding="utf-8",
+            errors="replace",
+            env={**os.environ, "PYTHONUTF8": "1"},
         )
         if result.returncode != 0:
             raise HTTPException(500, f"ML pipeline failed: {result.stderr}")
