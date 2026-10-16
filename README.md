@@ -32,12 +32,9 @@ double-click start.bat
 
 ### Option 2: Manual
 
-**Backend (Terminal 1):**
+**Backend (Terminal 1):** The first run creates the demo dataset only when no database exists. Later starts preserve the active dataset.
 ```powershell
-uv run python scripts/generate_data.py  # generate CSVs
-uv run python scripts/ingest.py          # load into DB
-uv run python scripts/run_ml.py          # detect anomalies
-uv run uvicorn api:app --reload          # start API
+uv run python main.py
 ```
 
 **Frontend (Terminal 2):**
@@ -50,7 +47,9 @@ Then open **http://localhost:5173**
 
 ## Using Your Own Data
 
-Drop your CSV files into `data/raw/`. The ingestion script auto-maps columns.
+Use the **Dataset & Model** page in the dashboard to upload your CSV files. Uploading replaces the active dataset, ingests it, and runs the anomaly model immediately. You can also place the files in `data/raw/` and run the pipeline manually.
+
+The upload requires `transactions.csv`, `products.csv`, and `customers.csv`. `campaigns.csv` and `inventory.csv` are optional. Column names are case-insensitive; missing non-ID columns are loaded as empty values.
 Expected schemas:
 
 | File | Required Columns |
@@ -78,5 +77,7 @@ Expected schemas:
 - `POST /api/anomalies/{id}/action` — 1-click resolution
 - `GET /api/stats` — Dashboard KPIs
 - `POST /api/pipeline/run` — Re-run ML scan
+- `GET /api/dataset` — Active dataset row counts
+- `POST /api/dataset/upload` — Replace dataset, ingest CSVs, and run ML
 - `GET /api/charts/*` — Chart data endpoints
 - `GET /docs` — Interactive Swagger UI

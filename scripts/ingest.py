@@ -5,7 +5,6 @@ Handles your own CSV files or the generated synthetic ones.
 import os
 import sqlite3
 import pandas as pd
-from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data", "raw")
@@ -20,7 +19,7 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
-def main():
+def main() -> dict[str, int]:
     print("🔄 Starting data ingestion...")
     conn = get_connection()
     _create_schema(conn)
@@ -33,21 +32,34 @@ def main():
         "transactions": _load_transactions,
     }
 
+    summary = {}
+    conn.execute("DELETE FROM anomalies")
+    conn.execute("DELETE FROM transactions")
+    conn.execute("DELETE FROM inventory")
+    conn.execute("DELETE FROM campaigns")
+    conn.execute("DELETE FROM customers")
+    conn.execute("DELETE FROM products")
+
     for name, loader in files.items():
         path = os.path.join(DATA_DIR, f"{name}.csv")
         if not os.path.exists(path):
-            print(f"  ⚠️  {name}.csv not found — skipping")
+            summary[name] = 0
+            print(f"  ⚠️  {name}.csv not found — using 0 rows")
             continue
         try:
             df = pd.read_csv(path)
             rows = loader(df, conn)
+            summary[name] = rows
             print(f"  ✅ {name}.csv → {rows} rows ingested")
         except Exception as e:
-            print(f"  ❌ {name}.csv failed: {e}")
+            conn.rollback()
+            conn.close()
+            raise ValueError(f"{name}.csv failed: {e}") from e
 
     conn.commit()
     conn.close()
     print(f"\n✅ Database ready: {DB_PATH}")
+    return summary
 
 
 def _create_schema(conn: sqlite3.Connection):
@@ -189,10 +201,17 @@ def _load_transactions(df: pd.DataFrame, conn: sqlite3.Connection) -> int:
 
 
 def _normalize_cols(df: pd.DataFrame, expected: list) -> pd.DataFrame:
-    """Add missing columns with None, select only expected."""
-    for col in expected:
-        if col not in df.columns:
-            df[col] = None
+    """Normalize column order and reject missing required identifiers."""
+    df.columns = [str(col).strip().lower() for col in df.columns]
+    missing = [col for col in expected if col not in df.columns]
+    required = [col for col in expected if col.endswith("_id")]
+    missing_required = [col for col in required if col in missing]
+    if missing_required:
+        raise ValueError(
+            f"missing required columns: {', '.join(missing_required)}"
+        )
+    for col in missing:
+        df[col] = None
     return df[expected]
 
 

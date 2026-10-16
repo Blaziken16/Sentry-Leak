@@ -6,6 +6,7 @@ import ResolvedPage from './components/ResolvedPage';
 import StatsBar from './components/StatsBar';
 import Sidebar from './components/Sidebar';
 import ToastContainer from './components/ToastContainer';
+import DatasetPage from './components/DatasetPage';
 import { useStats, useAnomalies } from './hooks';
 import { useToast } from './utils';
 import { api } from './api';
@@ -67,11 +68,13 @@ export default function App() {
             {page === 'alerts'   ? '🚨 Alert Feed'     : ''}
             {page === 'charts'   ? '📊 Analytics'      : ''}
             {page === 'resolved' ? '✅ Resolved Issues' : ''}
+            {page === 'dataset'  ? '🗂️ Dataset & Model' : ''}
           </div>
           <div className="topbar-subtitle">
             {page === 'alerts' ? 'Ranked by Cost of Inaction — act on the top items first' : ''}
             {page === 'charts' ? 'Revenue, campaigns, returns & inventory health' : ''}
             {page === 'resolved' ? 'Issues that have been actioned' : ''}
+            {page === 'dataset' ? 'Upload your data and train the anomaly detection model' : ''}
           </div>
         </div>
         <div className="topbar-spacer" />
@@ -128,6 +131,9 @@ export default function App() {
 
         {page === 'charts'   && <ChartsPage />}
         {page === 'resolved' && <ResolvedPage />}
+        {page === 'dataset'  && (
+          <DatasetPage onProcessed={() => { refetchAlerts(); refetchStats(); }} />
+        )}
       </div>
 
       <ToastContainer toasts={toasts} />
