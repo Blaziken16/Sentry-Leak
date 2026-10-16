@@ -1,5 +1,3 @@
-import { api } from '../api';
-
 export default function Sidebar({ page, onNavigate, openCount, onRunPipeline, runningPipeline }) {
   return (
     <nav className="sidebar">
@@ -36,6 +34,12 @@ export default function Sidebar({ page, onNavigate, openCount, onRunPipeline, ru
       </button>
 
       <div className="sidebar-section-label" style={{ marginTop: 8 }}>Data</div>
+      <button
+        className={`sidebar-nav-item ${page === 'dataset' ? 'active' : ''}`}
+        onClick={() => onNavigate('dataset')}
+      >
+        🗂️ Dataset & Model
+      </button>
       <button className="sidebar-nav-item" onClick={() => window.open('http://localhost:8000/docs', '_blank')}>
         📖 API Docs
       </button>
