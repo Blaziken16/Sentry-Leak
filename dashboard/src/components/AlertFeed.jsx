@@ -63,7 +63,7 @@ function AlertCard({ item, rank, selected, onClick }) {
         <div className="alert-card-desc">{item.description}</div>
         <div className="alert-card-meta">
           <span className="alert-type-pill">{typeLabel}</span>
-          <span className="sev-badge" style={{ padding: '1px 6px' }}
+          <span style={{ padding: '1px 6px' }}
             data-sev={sev}
             className={`sev-badge ${sev}`}
           >
