@@ -1,4 +1,4 @@
-# 🛍️ RetailIQ
+# 🛍️ Sentry-Leak
 
 ### Turn retail data into action, before small problems become expensive ones. 🚦
 
