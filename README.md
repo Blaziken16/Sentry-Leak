@@ -54,6 +54,9 @@ The React dashboard organizes the workflow into:
 - 📊 **Analytics:** Explore operational metrics and chart views.
 - ✅ **Resolved:** Revisit alerts that have been actioned.
 - 🗂️ **Dataset & Model:** Inspect loaded row counts, upload CSVs, and rerun the scan.
+- <img width="948" height="500" alt="Screenshot 2026-10-16 162154" src="https://github.com/user-attachments/assets/90c5215a-ed14-4044-949c-25c17f210f0c" />
+- <img width="940" height="503" alt="Screenshot 2026-10-16 162216" src="https://github.com/user-attachments/assets/09151862-696f-4f91-9232-d0e69fe9957c" />
+
 
 ## 🚀 Quick Start
 
